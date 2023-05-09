@@ -2,10 +2,12 @@ package ucase
 
 import (
 	"context"
-	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/entities"
+
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/entities"
 )
 
 type (
@@ -33,7 +35,7 @@ func NewNotifyUCase(repo ChatIDGetter, notifier ClientNotifier) *Notify {
 }
 
 func (n Notify) Notify(ctx context.Context, msg entities.NotificationMessage) error {
-	ctx, span := n.tracer.Start(ctx, "ClientRepo.Delete")
+	ctx, span := n.tracer.Start(ctx, "uCase.Notify")
 	defer span.End()
 
 	chatID, err := n.repo.GetChatIDByClientID(ctx, msg.ClientID)

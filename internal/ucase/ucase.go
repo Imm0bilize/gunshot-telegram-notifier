@@ -2,6 +2,7 @@ package ucase
 
 import (
 	"context"
+
 	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/entities"
 )
 
