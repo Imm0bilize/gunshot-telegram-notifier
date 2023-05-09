@@ -3,13 +3,14 @@ package app
 import (
 	"context"
 	"fmt"
-	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/config"
-	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/controller/grpcserver"
-	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/controller/msbroker"
-	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/infrastucture/bot"
-	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/infrastucture/repository"
-	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/ucase"
-	api "github.com/Imm0bilize/gunshot-telegram-notifier/pkg/api/proto"
+	"log"
+	"net"
+	stdHttp "net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -22,13 +23,13 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"log"
-	"net"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
+
+	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/config"
+	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/controller/http"
+	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/controller/msbroker"
+	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/infrastucture/bot"
+	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/infrastucture/repository"
+	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/ucase"
 )
 
 func createTraceProvider(cfg config.OTELConfig) func(context.Context) error {
@@ -128,17 +129,15 @@ func Run(cfg *config.Config) {
 		}
 	}()
 
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPC.Port))
-	if err != nil {
-		logger.Fatal(err.Error())
+	handler := http.NewHTTPServer(logger, uCase)
+	server := stdHttp.Server{
+		Addr:    net.JoinHostPort("", cfg.GRPC.Port),
+		Handler: handler,
 	}
 
-	grpcServer := grpc.NewServer()
-	api.RegisterClientServiceServer(grpcServer, grpcserver.NewClientService(uCase))
-
 	go func() {
-		if err := grpcServer.Serve(listener); err != nil {
-			log.Fatal("error during grpc server work", zap.Error(err))
+		if err = server.ListenAndServe(); err != nil && !errors.Is(err, stdHttp.ErrServerClosed) {
+			logger.Fatal("error running http server", zap.Error(err))
 		}
 	}()
 
@@ -146,6 +145,10 @@ func Run(cfg *config.Config) {
 
 	ctx, shutdownFunc := context.WithTimeout(context.Background(), time.Second*10)
 	defer shutdownFunc()
+
+	if err = server.Shutdown(ctx); err != nil {
+		logger.Error("error shutting down http server", zap.Error(err))
+	}
 
 	if err = dbDisconnect(ctx); err != nil {
 		logger.Error("error disconnecting db", zap.Error(err))

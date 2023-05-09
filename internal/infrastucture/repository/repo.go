@@ -2,13 +2,15 @@ package repository
 
 import (
 	"context"
-	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/entities"
+
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/Imm0bilize/gunshot-telegram-notifier/internal/entities"
 )
 
 type Repository struct {
@@ -18,7 +20,7 @@ type Repository struct {
 
 const _telegramCollectionName = "Telegram"
 
-var errRecordExists = errors.New("error record exists")
+var ErrRecordExists = errors.New("error record exists")
 
 func NewRepository(database *mongo.Database) *Repository {
 	return &Repository{
@@ -38,7 +40,7 @@ func (r Repository) Create(ctx context.Context, client entities.TGAccount) error
 	}
 
 	if count != 0 {
-		return errRecordExists
+		return ErrRecordExists
 	}
 
 	if _, err = r.collection.InsertOne(ctx, client); err != nil {
